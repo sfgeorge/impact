@@ -1,7 +1,8 @@
-import { app, BrowserWindow } from "electron";
+import { app, BrowserWindow, ipcMain } from "electron";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import fs from "node:fs";
 createRequire(import.meta.url);
 const __dirname$1 = path.dirname(fileURLToPath(import.meta.url));
 process.env.APP_ROOT = path.join(__dirname$1, "..");
@@ -37,7 +38,30 @@ app.on("activate", () => {
     createWindow();
   }
 });
-app.whenReady().then(createWindow);
+app.whenReady().then(() => {
+  createWindow();
+  const settingsPath = path.join(app.getPath("userData"), "settings.json");
+  ipcMain.handle("get-settings", async () => {
+    try {
+      if (fs.existsSync(settingsPath)) {
+        const data = fs.readFileSync(settingsPath, "utf-8");
+        return JSON.parse(data);
+      }
+    } catch (error) {
+      console.error("Failed to load settings:", error);
+    }
+    return null;
+  });
+  ipcMain.handle("save-settings", async (_, settings) => {
+    try {
+      fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
+      return true;
+    } catch (error) {
+      console.error("Failed to save settings:", error);
+      return false;
+    }
+  });
+});
 export {
   MAIN_DIST,
   RENDERER_DIST,

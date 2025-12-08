@@ -16,7 +16,8 @@ electron.contextBridge.exposeInMainWorld("ipcRenderer", {
   invoke(...args) {
     const [channel, ...omit] = args;
     return electron.ipcRenderer.invoke(channel, ...omit);
-  }
-  // You can expose other APTs you need here.
-  // ...
+  },
+  // Settings API
+  getSettings: () => electron.ipcRenderer.invoke("get-settings"),
+  saveSettings: (settings) => electron.ipcRenderer.invoke("save-settings", settings)
 });

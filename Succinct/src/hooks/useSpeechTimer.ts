@@ -8,46 +8,72 @@ interface UseSpeechTimerProps {
 export const useSpeechTimer = ({ isSpeaking, silenceThresholdMs = 2000 }: UseSpeechTimerProps) => {
     const [elapsedTime, setElapsedTime] = useState(0);
     const [isSessionActive, setIsSessionActive] = useState(false);
-    const silenceStartRef = useRef<number | null>(null);
 
+    const sessionStartTimeRef = useRef<number | null>(null);
+    const silenceStartTimeRef = useRef<number | null>(null);
+
+    // Effect to handle state transitions (Speaking <-> Silent)
     useEffect(() => {
-        let intervalId: NodeJS.Timeout;
-
         if (isSpeaking) {
-            // User is speaking: Clear any silence tracker, ensure session is active
-            silenceStartRef.current = null;
-            setIsSessionActive(true);
-
-            intervalId = setInterval(() => {
-                setElapsedTime(prev => prev + 100);
-            }, 100);
-        } else if (isSessionActive) {
-            // User stopped speaking, but session detected. Check for silence timeout.
-            if (!silenceStartRef.current) {
-                silenceStartRef.current = Date.now();
+            // Speech detected
+            if (!isSessionActive) {
+                // Start new session
+                setIsSessionActive(true);
+                sessionStartTimeRef.current = Date.now();
+                setElapsedTime(0);
             }
+            // Clear silence timer since we are speaking
+            silenceStartTimeRef.current = null;
+        } else {
+            // Silence detected
+            if (isSessionActive && !silenceStartTimeRef.current) {
+                // Mark start of silence
+                silenceStartTimeRef.current = Date.now();
+            }
+        }
+    }, [isSpeaking, isSessionActive]);
 
-            intervalId = setInterval(() => {
-                if (silenceStartRef.current && (Date.now() - silenceStartRef.current > silenceThresholdMs)) {
-                    // Silence threshold reached: Auto-reset
-                    console.log("Silence detected, resetting timer");
-                    setElapsedTime(0);
-                    setIsSessionActive(false);
-                    silenceStartRef.current = null;
+    // Effect to drive the timer tick
+    useEffect(() => {
+        let animationFrameId: number;
+
+        const tick = () => {
+            if (isSessionActive && sessionStartTimeRef.current) {
+                const now = Date.now();
+
+                // Update elapsed time (Always based on start time, so it never pauses/drifts)
+                setElapsedTime(now - sessionStartTimeRef.current);
+
+                // Check silence threshold
+                if (!isSpeaking && silenceStartTimeRef.current) {
+                    if (now - silenceStartTimeRef.current > silenceThresholdMs) {
+                        // Reset session
+                        setIsSessionActive(false);
+                        sessionStartTimeRef.current = null;
+                        silenceStartTimeRef.current = null;
+                        setElapsedTime(0);
+                        return; // Stop loop
+                    }
                 }
-            }, 100);
+
+                animationFrameId = requestAnimationFrame(tick);
+            }
+        };
+
+        if (isSessionActive) {
+            animationFrameId = requestAnimationFrame(tick);
         }
 
-        return () => clearInterval(intervalId);
-    }, [isSpeaking, isSessionActive, silenceThresholdMs]);
-
-    const resetTimer = () => {
-        setElapsedTime(0);
-        setIsSessionActive(false);
-    };
+        return () => cancelAnimationFrame(animationFrameId);
+    }, [isSessionActive, isSpeaking, silenceThresholdMs]);
 
     return {
-        elapsedTime, // in milliseconds
-        resetTimer
+        elapsedTime,
+        resetTimer: () => {
+            setIsSessionActive(false);
+            sessionStartTimeRef.current = null;
+            silenceStartTimeRef.current = null;
+            setElapsedTime(0);
+        }
     };
 };

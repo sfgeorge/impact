@@ -1,7 +1,8 @@
-import { app, BrowserWindow } from 'electron'
+import { app, BrowserWindow, ipcMain } from 'electron'
 import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
+import fs from 'node:fs'
 
 const require = createRequire(import.meta.url)
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -65,4 +66,31 @@ app.on('activate', () => {
   }
 })
 
-app.whenReady().then(createWindow)
+app.whenReady().then(() => {
+  createWindow()
+
+  // IPC Handlers for Settings Persistence
+  const settingsPath = path.join(app.getPath('userData'), 'settings.json')
+
+  ipcMain.handle('get-settings', async () => {
+    try {
+      if (fs.existsSync(settingsPath)) {
+        const data = fs.readFileSync(settingsPath, 'utf-8')
+        return JSON.parse(data)
+      }
+    } catch (error) {
+      console.error('Failed to load settings:', error)
+    }
+    return null
+  })
+
+  ipcMain.handle('save-settings', async (_, settings) => {
+    try {
+      fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2))
+      return true
+    } catch (error) {
+      console.error('Failed to save settings:', error)
+      return false
+    }
+  })
+})
