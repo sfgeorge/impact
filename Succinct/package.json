@@ -1,5 +1,9 @@
 {
   "name": "succinct",
+  "description": "Electron + React app for coaching succinct, impactful speech delivery",
+  "license": "MIT",
+  "repository": "https://github.com/sfgeorge/impact",
+  "author": "Stephen George",
   "private": true,
   "version": "0.0.0",
   "type": "module",
